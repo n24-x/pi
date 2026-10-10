@@ -11,7 +11,7 @@ import (
 // It implements standard time operations,
 // but allows the user to control the passage of time.
 //
-// Use the [Add] method to progress time.
+// Use the [Advance] method to progress time.
 type Mock struct {
 	mu  sync.RWMutex
 	now time.Time
@@ -29,7 +29,7 @@ type waiter struct {
 	fn    func()
 }
 
-// Add progresses time by the given duration.
+// Advance progresses time by the given duration.
 // Other operations waiting for the time to advance
 // will be resolved if they are within range.
 //
@@ -38,7 +38,7 @@ type waiter struct {
 // Avoid racing with operations that have side effects.
 //
 // Panics if the duration is negative.
-func (c *Mock) Add(d time.Duration) {
+func (c *Mock) Advance(d time.Duration) {
 	if d < 0 {
 		panic("cannot add negative duration")
 	}
@@ -107,7 +107,7 @@ func (c *Mock) Since(t time.Time) time.Duration {
 // Sleep pauses the current goroutine for the given duration.
 //
 // With the mock clock, this will freeze
-// until the clock is advanced with [Add] past the deadline.
+// until the clock is advanced with [Advance] past the deadline.
 func (c *Mock) Sleep(d time.Duration) {
 	ch := make(chan struct{})
 	c.runAt(c.Now().Add(d), func() { close(ch) })
