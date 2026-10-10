@@ -73,7 +73,7 @@ func testTime(t *testing.T, clock Time, advanceClock func(d time.Duration)) {
 				t.Error("context must have exceeded its deadline")
 			}
 		case <-time.After(10 * time.Millisecond):
-			t.Fatalf("expected context to be done")
+			t.Fatal("timed out waiting for context to be done")
 		}
 	})
 
@@ -88,6 +88,25 @@ func testTime(t *testing.T, clock Time, advanceClock func(d time.Duration)) {
 
 		if ctx2.Value(key) != "bar" {
 			t.Error("value must be preserved")
+		}
+	})
+
+	t.Run("WithTimeout/Cancel", func(t *testing.T) {
+		ctx, cancel := clock.WithTimeout(context.Background(), 1*time.Millisecond)
+		cancel()
+
+		select {
+		case <-ctx.Done():
+			err := ctx.Err()
+			if err == nil {
+				t.Error("done context must error")
+			}
+			if !errors.Is(err, context.Canceled) {
+				t.Error("context must have been canceled")
+			}
+
+		case <-time.After(10 * time.Millisecond):
+			t.Fatal("timed out waiting for context to be done")
 		}
 	})
 }
