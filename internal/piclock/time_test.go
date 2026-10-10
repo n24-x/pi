@@ -76,4 +76,18 @@ func testTime(t *testing.T, clock Time, advanceClock func(d time.Duration)) {
 			t.Fatalf("expected context to be done")
 		}
 	})
+
+	t.Run("WithTimeout/Value", func(t *testing.T) {
+		type contextKey string
+		key := contextKey("foo")
+
+		ctx1 := context.WithValue(context.Background(), key, "bar")
+
+		ctx2, cancel := clock.WithTimeout(ctx1, 1*time.Millisecond)
+		defer cancel()
+
+		if ctx2.Value(key) != "bar" {
+			t.Error("value must be preserved")
+		}
+	})
 }
