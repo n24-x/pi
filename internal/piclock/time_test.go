@@ -1,6 +1,7 @@
 package piclock
 
 import (
+	"context"
 	"testing"
 	"time"
 )
@@ -45,4 +46,18 @@ func testTime(t *testing.T, clock Time, advanceClock func(d time.Duration)) {
 		}
 	})
 
+	t.Run("WithTimeout", func(t *testing.T) {
+		ctx, cancel := clock.WithTimeout(context.Background(), 1*time.Millisecond)
+		defer cancel()
+
+		t.Run("Deadline", func(t *testing.T) {
+			dl, ok := ctx.Deadline()
+			if !ok {
+				t.Error("must have a deadline")
+			}
+			if !dl.After(now) {
+				t.Error("deadline must be in the future")
+			}
+		})
+	})
 }
