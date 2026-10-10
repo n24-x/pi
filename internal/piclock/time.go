@@ -1,4 +1,4 @@
-package pitime
+package piclock
 
 import (
 	"context"
