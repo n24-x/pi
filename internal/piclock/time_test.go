@@ -2,6 +2,7 @@ package piclock
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 )
@@ -59,5 +60,20 @@ func testTime(t *testing.T, clock Time, advanceClock func(d time.Duration)) {
 				t.Error("deadline must be in the future")
 			}
 		})
+
+		advanceClock(1 * time.Millisecond)
+
+		select {
+		case <-ctx.Done():
+			err := ctx.Err()
+			if err == nil {
+				t.Error("done context must error")
+			}
+			if !errors.Is(err, context.DeadlineExceeded) {
+				t.Error("context must have exceeded its deadline")
+			}
+		case <-time.After(10 * time.Millisecond):
+			t.Fatalf("expected context to be done")
+		}
 	})
 }
