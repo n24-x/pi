@@ -24,9 +24,10 @@ type Mock struct {
 	waiterAdded *sync.Cond
 }
 
+// TODO rename to scheduledEvent
 type waiter struct {
-	until time.Time
-	fn    func()
+	at time.Time // future time
+	fn func()
 }
 
 // Advance progresses time by the given duration.
@@ -46,18 +47,20 @@ func (c *Mock) Advance(d time.Duration) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
+	// Sort waiters in ascending order of their scheduled time,
+	// so that the earliest waiter is resolved first.
 	sort.Slice(c.waiters, func(i, j int) bool {
-		return c.waiters[i].until.Before(c.waiters[j].until)
+		return c.waiters[i].at.Before(c.waiters[j].at)
 	})
 
-	newTime := c.now.Add(d)
 	// newTime won't be recorded until the end of this method.
 	// This ensures that any waiters that are resolved
 	// are resolved at the time they were expecting.
+	newTime := c.now.Add(d)
 
 	for len(c.waiters) > 0 {
 		w := c.waiters[0]
-		if w.until.After(newTime) {
+		if w.at.After(newTime) {
 			break
 		}
 		c.waiters[0] = waiter{} // avoid memory leak
@@ -65,7 +68,7 @@ func (c *Mock) Advance(d time.Duration) {
 
 		// The waiter is within range.
 		// Travel to the time of the waiter and resolve it.
-		c.now = w.until
+		c.now = w.at
 
 		// The waiter may schedule more work
 		// so we must release the lock.
@@ -120,7 +123,7 @@ func (c *Mock) runAt(t time.Time, fn func()) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	c.waiters = append(c.waiters, waiter{until: t, fn: fn})
+	c.waiters = append(c.waiters, waiter{at: t, fn: fn})
 	c.waiterAdded.Broadcast()
 }
 
