@@ -29,6 +29,24 @@ type waiter struct {
 	onDue func()
 }
 
+// AwaitScheduled blocks until there are at least N
+// operations scheduled for the future.
+func (c *Mock) AwaitScheduled(n int) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	// Note: waitersChanged is associated with c.mu,
+	// the same lock we're holding here.
+	//
+	// When we call Wait(), it'll release the lock
+	// and block until signaled by runAt,
+	// at which point it'll reacquire the lock
+	// (waiting until runAt has released it).
+	for len(c.waiters) < n {
+		c.waitersChanged.Wait()
+	}
+}
+
 // Advance progresses time by the given duration.
 // Other operations waiting for the time to advance
 // will be resolved if they are within range.
@@ -82,24 +100,6 @@ func (c *Mock) Advance(d time.Duration) {
 	c.now = newTime
 }
 
-// AwaitScheduled blocks until there are at least N
-// operations scheduled for the future.
-func (c *Mock) AwaitScheduled(n int) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	// Note: waitersChanged is associated with c.mu,
-	// the same lock we're holding here.
-	//
-	// When we call Wait(), it'll release the lock
-	// and block until signaled by runAt,
-	// at which point it'll reacquire the lock
-	// (waiting until runAt has released it).
-	for len(c.waiters) < n {
-		c.waitersChanged.Wait()
-	}
-}
-
 var _ Time = (*Mock)(nil)
 
 // NewMock builds a new mock clock
@@ -141,6 +141,8 @@ func (c *Mock) runAt(t time.Time, onDue func()) {
 	defer c.mu.Unlock()
 
 	c.waiters = append(c.waiters, waiter{at: t, onDue: onDue})
+
+	// see [AwaitScheduled]
 	c.waitersChanged.Broadcast()
 }
 
@@ -151,15 +153,10 @@ func (c *Mock) runAt(t time.Time, onDue func()) {
 // If the cancel function is called before the deadline is passed,
 // the context's Err method returns context.Canceled.
 func (c *Mock) WithTimeout(ctx context.Context, d time.Duration) (context.Context, context.CancelFunc) {
-	// Unfortunately, we can't use context.WithCancelCause here.
-	// Per its documentation (and verified by trying it):
-	//
-	//   ctx, cancel := context.WithCancelCause(parent)
-	//   cancel(myError)
-	//   ctx.Err() // returns context.Canceled
-	//   context.Cause(ctx) // returns myError
-	//
-	// So it won't do for our purposes.
+	// The standard library can't provide this: WithCancelCause's Err always
+	// reports context.Canceled, and WithDeadline fires on REAL time. We need Err
+	// to distinguish DeadlineExceeded from Canceled on the mock clock's timeline,
+	// so we use the handwritten deadlineCtx instead.
 	deadline := c.Now().Add(d)
 	inner, cancelInner := context.WithCancel(ctx)
 	dctx := &deadlineCtx{
