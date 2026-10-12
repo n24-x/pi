@@ -26,8 +26,8 @@ type Mock struct {
 
 // TODO rename to scheduledEvent
 type waiter struct {
-	at time.Time // future time
-	fn func()
+	at    time.Time // future time
+	onDue func()
 }
 
 // Advance progresses time by the given duration.
@@ -73,7 +73,7 @@ func (c *Mock) Advance(d time.Duration) {
 		// The waiter may schedule more work
 		// so we must release the lock.
 		c.mu.Unlock()
-		w.fn()
+		w.onDue()
 		// Sleeping here is necessary to let the side effects of waiters
 		// take effect before we continue.
 		time.Sleep(1 * time.Millisecond)
@@ -119,11 +119,11 @@ func (c *Mock) Sleep(d time.Duration) {
 
 // runAt schedules the given function to be run at the given time.
 // The function runs without a lock held, so it may schedule more work.
-func (c *Mock) runAt(t time.Time, fn func()) {
+func (c *Mock) runAt(t time.Time, onDue func()) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	c.waiters = append(c.waiters, waiter{at: t, fn: fn})
+	c.waiters = append(c.waiters, waiter{at: t, onDue: onDue})
 	c.waiterAdded.Broadcast()
 }
 
