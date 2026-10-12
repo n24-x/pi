@@ -3,13 +3,100 @@ package piclock
 import (
 	"context"
 	"errors"
+	"sync"
 	"testing"
 	"time"
 )
 
-// func TestSystemTime(t *testing.T) {
-// 	time := System
-// }
+func TestSystemTime(t *testing.T) {
+	clock := System
+	testTime(t, System, clock.Sleep)
+}
+
+func TestMockTime(t *testing.T) {
+	clock := NewMock()
+	testTime(t, clock, clock.Advance)
+}
+
+func TestMock_AdvanceNegative(t *testing.T) {
+	clock := NewMock()
+
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("advance with negative duration must panic")
+		}
+	}()
+	clock.Advance(-1)
+}
+
+func TestMock_Sleep(t *testing.T) {
+	clock := NewMock()
+
+	ch := make(chan struct{})
+	go func() {
+		clock.Sleep(2 * time.Millisecond)
+		close(ch)
+	}()
+
+	// We cannot advance time until we're certain
+	// that the Sleep call has started waiting.
+	// Otherwise, we'll advance that one millisecond,
+	// and then the Sleep will start waiting for another Advance,
+	// which will never come.
+	//
+	// AwaitScheduled will block until there is at least one
+	// scheduled event.
+	clock.AwaitScheduled(1)
+
+	// Advance only one millisecond, the Sleep should not return.
+	clock.Advance(1 * time.Millisecond)
+	select {
+	case <-ch:
+		t.Fatal("sleep should not have returned")
+	case <-time.After(1 * time.Millisecond):
+		// expected: Sleep still blocked
+	}
+
+	clock.Advance(1 * time.Millisecond)
+	select {
+	case <-ch:
+		// expected: Sleep returned
+	case <-time.After(10 * time.Millisecond):
+		t.Fatal("expected Sleep to return")
+	}
+}
+
+func TestMock_ManySleepers(t *testing.T) {
+	const N = 200
+
+	clock := NewMock()
+
+	var wg sync.WaitGroup
+	wg.Add(N)
+	for range N {
+		go func() {
+			defer wg.Done()
+
+			clock.Sleep(1 * time.Millisecond)
+		}()
+	}
+
+	clock.AwaitScheduled(N)
+	clock.Advance(1 * time.Millisecond)
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		wg.Wait()
+	}()
+
+	select {
+	case <-done:
+		// expected: all sleepers are done
+	case <-time.After(10 * time.Millisecond):
+		t.Fatal("expected all sleepers to be done")
+	}
+}
 
 func testTime(t *testing.T, clock Time, advanceClock func(d time.Duration)) {
 	now := clock.Now()
@@ -41,7 +128,7 @@ func testTime(t *testing.T, clock Time, advanceClock func(d time.Duration)) {
 			advanceClock(1 * time.Millisecond)
 		}()
 
-		clock.Sleep(1 * time.Millisecond)
+		clock.Sleep(1 * time.Millisecond) // add a waiter; see time_mock.go L131
 		if clock.Since(start) == 0 {
 			t.Error("time must have advanced")
 		}
