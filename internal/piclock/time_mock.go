@@ -20,11 +20,10 @@ type Mock struct {
 	// Each waiter knows the time at which it should be resolved.
 	// When the clock advances, all waiters that are in range are resolved
 	// in chronological order.
-	waiters     []waiter
-	waiterAdded *sync.Cond
+	waiters        []waiter
+	waitersChanged *sync.Cond
 }
 
-// TODO rename to scheduledEvent
 type waiter struct {
 	at    time.Time // future time
 	onDue func()
@@ -89,7 +88,7 @@ func (c *Mock) AwaitScheduled(n int) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	// Note: waiterAdded is associated with c.mu,
+	// Note: waitersChanged is associated with c.mu,
 	// the same lock we're holding here.
 	//
 	// When we call Wait(), it'll release the lock
@@ -97,7 +96,7 @@ func (c *Mock) AwaitScheduled(n int) {
 	// at which point it'll reacquire the lock
 	// (waiting until runAt has released it).
 	for len(c.waiters) < n {
-		c.waiterAdded.Wait()
+		c.waitersChanged.Wait()
 	}
 }
 
@@ -107,7 +106,7 @@ var _ Time = (*Mock)(nil)
 // using the current actual time as the initial time.
 func NewMock() *Mock {
 	m := &Mock{now: time.Now()}
-	m.waiterAdded = sync.NewCond(&m.mu)
+	m.waitersChanged = sync.NewCond(&m.mu)
 	return m
 }
 
@@ -142,7 +141,7 @@ func (c *Mock) runAt(t time.Time, onDue func()) {
 	defer c.mu.Unlock()
 
 	c.waiters = append(c.waiters, waiter{at: t, onDue: onDue})
-	c.waiterAdded.Broadcast()
+	c.waitersChanged.Broadcast()
 }
 
 // WithTimeout returns a new context with a deadline of now + d.
