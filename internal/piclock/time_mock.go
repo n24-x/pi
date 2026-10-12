@@ -83,6 +83,24 @@ func (c *Mock) Advance(d time.Duration) {
 	c.now = newTime
 }
 
+// AwaitScheduled blocks until there are at least N
+// operations scheduled for the future.
+func (c *Mock) AwaitScheduled(n int) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	// Note: waiterAdded is associated with c.mu,
+	// the same lock we're holding here.
+	//
+	// When we call Wait(), it'll release the lock
+	// and block until signaled by runAt,
+	// at which point it'll reacquire the lock
+	// (waiting until runAt has released it).
+	for len(c.waiters) < n {
+		c.waiterAdded.Wait()
+	}
+}
+
 var _ Time = (*Mock)(nil)
 
 // NewMock builds a new mock clock
@@ -157,22 +175,4 @@ func (c *Mock) WithTimeout(ctx context.Context, d time.Duration) (context.Contex
 		dctx.cancel(context.DeadlineExceeded)
 	})
 	return ctx, func() { dctx.cancel(context.Canceled) }
-}
-
-// AwaitScheduled blocks until there are at least N
-// operations scheduled for the future.
-func (c *Mock) AwaitScheduled(n int) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	// Note: waiterAdded is associated with c.mu,
-	// the same lock we're holding here.
-	//
-	// When we call Wait(), it'll release the lock
-	// and block until signaled by runAt,
-	// at which point it'll reacquire the lock
-	// (waiting until runAt has released it).
-	for len(c.waiters) < n {
-		c.waiterAdded.Wait()
-	}
 }
