@@ -217,11 +217,3 @@ func (l *Lifecycle) runStopHook(ctx context.Context, hook Hook) (
 	err = hook.OnStop(ctx)
 	return l.clock.Since(begin), err
 }
-
-// RunningHookCaller returns the name of the hook that was running when a Start/Stop
-// hook timed out.
-func (l *Lifecycle) RunningHookCaller() string {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	return l.runningHook.callerFrame.Function
-}
