@@ -2,6 +2,8 @@ package pireflect
 
 import (
 	"testing"
+
+	"github.com/n24-x/goleak"
 )
 
 func TestCaller(t *testing.T) {
@@ -87,8 +89,6 @@ func TestSanitizeFuncNames(t *testing.T) {
 	}
 }
 
-// TODO(next)
-
-// func TestMain(m *testing.M) {
-// 	goleak.VerifyTestMain(m)
-// }
+func TestMain(m *testing.M) {
+	goleak.VerifyTestMain(m)
+}
