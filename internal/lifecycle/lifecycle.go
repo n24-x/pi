@@ -200,12 +200,12 @@ func (l *Lifecycle) runStopHook(ctx context.Context, hook Hook) (
 		funcName = pireflect.FuncName(hook.OnStop)
 	}
 
-	l.logger.LogEvent(&pievent.OnStartExecuting{
+	l.logger.LogEvent(&pievent.OnStopExecuting{
 		CallerName:   hook.callerFrame.Function,
 		FunctionName: funcName,
 	})
 	defer func() {
-		l.logger.LogEvent(&pievent.OnStartExecuted{
+		l.logger.LogEvent(&pievent.OnStopExecuted{
 			CallerName:   hook.callerFrame.Function,
 			FunctionName: funcName,
 			ElapsedTime:  elapsedTime,

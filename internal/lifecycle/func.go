@@ -34,7 +34,7 @@ type (
 // A Callable is a constraint that matches functions that are, or can be
 // converted to, functions suitable for a Hook.
 //
-// Callable must be identical to [fx.HookFunc].
+// Callable must be identical to [pi.HookFunc].
 type Callable interface {
 	~Func | ~ErrorFunc | ~ContextFunc | ~ContextErrorFunc
 }
