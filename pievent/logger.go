@@ -6,7 +6,7 @@ type Logger interface {
 	LogEvent(Event)
 }
 
-// NopLogger is an Pi event logger that ignores all messages.
+// NopLogger is a Pi event logger that ignores all messages.
 var NopLogger = nopLogger{}
 
 type nopLogger struct{}
